@@ -51,6 +51,7 @@
       command: python3 -m venv "{{ venv_dir }}"
       args:
         creates: "{{ venv_dir }}/bin/activate"
+      become_user: ubuntu
 
     #########################################
     # 5. Install Python dependencies in venv
@@ -60,9 +61,21 @@
         requirements: "{{ app_dir }}/requirements.txt"
         virtualenv: "{{ venv_dir }}"
         virtualenv_python: python3
+      become_user: ubuntu
 
     #########################################
-    # 6. Setup systemd service
+    # 6. Ensure ownership of app directory
+    #########################################
+    - name: Set ownership of app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        recurse: yes
+        owner: ubuntu
+        group: ubuntu
+
+    #########################################
+    # 7. Setup systemd service
     #########################################
     - name: Copy systemd service file
       copy:
@@ -74,9 +87,11 @@
 
           [Service]
           User=ubuntu
+          Group=ubuntu
           WorkingDirectory={{ app_dir }}
-          ExecStart={{ venv_dir }}/bin/python -m flask run --host=127.0.0.1 --port={{ flask_port }}
+          Environment="PATH={{ venv_dir }}/bin:/usr/bin:/bin"
           Environment="FLASK_APP=app.py"
+          ExecStart={{ venv_dir }}/bin/python -m flask run --host=127.0.0.1 --port={{ flask_port }}
           Restart=always
 
           [Install]
@@ -85,7 +100,7 @@
         - Reload systemd
 
     #########################################
-    # 7. Enable & start the service
+    # 8. Enable & start the service
     #########################################
     - name: Enable and start app service
       systemd:
@@ -94,7 +109,7 @@
         enabled: yes
 
     #########################################
-    # 8. Configure Nginx
+    # 9. Configure Nginx
     #########################################
     - name: Configure Nginx reverse proxy
       copy:
@@ -103,7 +118,7 @@
           server {
               listen 80;
               server_name _;
-              
+
               location / {
                   proxy_pass http://127.0.0.1:{{ flask_port }};
                   proxy_set_header Host $host;
@@ -112,6 +127,7 @@
                   proxy_set_header X-Forwarded-Proto $scheme;
               }
           }
+
     - name: Enable Nginx site
       file:
         src: /etc/nginx/sites-available/app
