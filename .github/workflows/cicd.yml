@@ -57,18 +57,21 @@ jobs:
       # 5. Terraform Init
       #############################
       - name: Terraform Init
+        working-directory: terraform
         run: terraform init
 
       #############################
       # 6. Terraform Plan
       #############################
       - name: Terraform Plan
+        working-directory: terraform
         run: terraform plan
 
       #############################
       # 7. Terraform Apply
       #############################
       - name: Terraform Apply
+        working-directory: terraform
         run: terraform apply -auto-approve
 
       #############################
