@@ -1,32 +1,8 @@
 ##########################################
-# Terraform Backend (S3 Only – No DynamoDB)
+# main.tf — only resources
 ##########################################
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
 
-  backend "s3" {
-    bucket = "devops-tfstate-bucket-manikanta"      # YOUR S3 BUCKET NAME
-    key    = "ec2-project/terraform.tfstate"     # STATE FILE PATH IN BUCKET
-    region = "ap-southeast-1"                    # UPDATED REGION
-    encrypt = true
-  }
-}
-
-##########################################
-# Provider
-##########################################
-provider "aws" {
-  region = "ap-southeast-1"   # UPDATED REGION
-}
-
-##########################################
 # Security Group
-##########################################
 resource "aws_security_group" "web_sg" {
   name        = "web-sg"
   description = "Allow HTTP & SSH"
@@ -56,19 +32,15 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-##########################################
-# Key Pair (using existing public key)
-##########################################
+# Key Pair
 resource "aws_key_pair" "main_key" {
   key_name   = "devops-key"
   public_key = file("${path.module}/id_rsa.pub")
 }
 
-##########################################
 # EC2 Instance
-##########################################
 resource "aws_instance" "web_server" {
-  ami           = "ami-00d8fc944fb171e29"   # Ubuntu 22.04 for ap-southeast-1
+  ami           = "ami-00d8fc944fb171e29"   # Ubuntu 22.04 ap-southeast-1
   instance_type = "t2.micro"
   key_name      = aws_key_pair.main_key.key_name
 
