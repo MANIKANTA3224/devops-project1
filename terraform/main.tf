@@ -38,10 +38,10 @@ resource "aws_key_pair" "main_key" {
 }
 
 ######################################
-# 3. EC2 Instance
+# 3. EC2 Instance (UBUNTU)
 ######################################
 resource "aws_instance" "web" {
-  ami           = "ami-0b08bfc6ff7069aff" # Amazon Linux 2023 (ap-southeast-1)
+  ami           = "ami-00d8fc944fb171e29"  # ✅ Ubuntu AMI
   instance_type = var.instance_type
   key_name      = aws_key_pair.main_key.key_name
 
@@ -50,6 +50,6 @@ resource "aws_instance" "web" {
   ]
 
   tags = {
-    Name = "DevOps-Final-Project"
+    Name = "DevOps-Final-Project-Ubuntu"
   }
 }
