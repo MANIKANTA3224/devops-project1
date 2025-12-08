@@ -4,23 +4,18 @@
   vars:
     app_dir: /opt/app
     venv_dir: /opt/app/venv
-    service_name: app
-    python_bin: /opt/app/venv/bin/python
-    pip_bin: /opt/app/venv/bin/pip
-    nginx_conf_path: /etc/nginx/sites-available/app
-    nginx_conf_link: /etc/nginx/sites-enabled/app
+    flask_port: 5000
 
   tasks:
-
     #########################################
-    # 1. Update apt and install dependencies
+    # 1. Update apt cache & install dependencies
     #########################################
     - name: Update apt cache
-      ansible.builtin.apt:
+      apt:
         update_cache: yes
 
     - name: Install required packages
-      ansible.builtin.apt:
+      apt:
         name:
           - python3-venv
           - python3-pip
@@ -31,102 +26,114 @@
     # 2. Create application directory
     #########################################
     - name: Create app directory
-      ansible.builtin.file:
+      file:
         path: "{{ app_dir }}"
         state: directory
+        owner: ubuntu
+        group: ubuntu
         mode: "0755"
 
     #########################################
     # 3. Copy application files
     #########################################
     - name: Copy application files
-      ansible.builtin.copy:
+      copy:
         src: ../app/
         dest: "{{ app_dir }}/"
+        owner: ubuntu
+        group: ubuntu
         mode: "0755"
 
     #########################################
     # 4. Create Python virtual environment
     #########################################
     - name: Create virtual environment
-      ansible.builtin.command:
-        cmd: python3 -m venv "{{ venv_dir }}"
+      command: python3 -m venv "{{ venv_dir }}"
+      args:
         creates: "{{ venv_dir }}/bin/activate"
 
     #########################################
-    # 5. Install Python dependencies inside venv
+    # 5. Install Python dependencies in venv
     #########################################
     - name: Install Python dependencies
-      ansible.builtin.pip:
+      pip:
         requirements: "{{ app_dir }}/requirements.txt"
-        executable: "{{ pip_bin }}"
+        virtualenv: "{{ venv_dir }}"
+        virtualenv_python: python3
 
     #########################################
-    # 6. Copy systemd service (use venv)
+    # 6. Setup systemd service
     #########################################
-    - name: Copy systemd service
-      ansible.builtin.copy:
-        dest: /etc/systemd/system/{{ service_name }}.service
+    - name: Copy systemd service file
+      copy:
+        dest: /etc/systemd/system/app.service
         content: |
           [Unit]
-          Description=Python App Service
+          Description=Python Flask App
           After=network.target
 
           [Service]
           User=ubuntu
           WorkingDirectory={{ app_dir }}
-          ExecStart={{ python_bin }} app.py
+          ExecStart={{ venv_dir }}/bin/python -m flask run --host=127.0.0.1 --port={{ flask_port }}
+          Environment="FLASK_APP=app.py"
           Restart=always
 
           [Install]
           WantedBy=multi-user.target
-        mode: "0644"
+      notify:
+        - Reload systemd
 
-    - name: Reload systemd
-      ansible.builtin.systemd:
-        daemon_reload: yes
-
-    - name: Start and enable app service
-      ansible.builtin.systemd:
-        name: "{{ service_name }}"
+    #########################################
+    # 7. Enable & start the service
+    #########################################
+    - name: Enable and start app service
+      systemd:
+        name: app
         state: started
         enabled: yes
 
     #########################################
-    # 7. Configure Nginx as reverse proxy
+    # 8. Configure Nginx
     #########################################
-    - name: Create Nginx config for app
-      ansible.builtin.copy:
-        dest: "{{ nginx_conf_path }}"
+    - name: Configure Nginx reverse proxy
+      copy:
+        dest: /etc/nginx/sites-available/app
         content: |
           server {
               listen 80;
               server_name _;
-
+              
               location / {
-                  proxy_pass http://127.0.0.1:5000;
+                  proxy_pass http://127.0.0.1:{{ flask_port }};
                   proxy_set_header Host $host;
                   proxy_set_header X-Real-IP $remote_addr;
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto $scheme;
               }
           }
-        mode: "0644"
-
     - name: Enable Nginx site
-      ansible.builtin.file:
-        src: "{{ nginx_conf_path }}"
-        dest: "{{ nginx_conf_link }}"
+      file:
+        src: /etc/nginx/sites-available/app
+        dest: /etc/nginx/sites-enabled/app
         state: link
-        force: yes
+
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
 
     - name: Test Nginx configuration
-      ansible.builtin.command: nginx -t
-      register: nginx_test
-      failed_when: nginx_test.rc != 0
+      command: nginx -t
 
     - name: Reload Nginx
-      ansible.builtin.systemd:
+      service:
         name: nginx
         state: restarted
-        enabled: yes
+
+  #########################################
+  # Handlers
+  #########################################
+  handlers:
+    - name: Reload systemd
+      command: systemctl daemon-reload
