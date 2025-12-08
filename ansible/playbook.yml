@@ -89,9 +89,10 @@
           User=ubuntu
           Group=ubuntu
           WorkingDirectory={{ app_dir }}
-          Environment="PATH={{ venv_dir }}/bin:/usr/bin:/bin"
+          ExecStart=/opt/app/venv/bin/python -m flask run --host=127.0.0.1 --port=5000 --reload
           Environment="FLASK_APP=app.py"
-          ExecStart={{ venv_dir }}/bin/python -m flask run --host=127.0.0.1 --port={{ flask_port }}
+          Environment="FLASK_ENV=development"
+
           Restart=always
 
           [Install]
