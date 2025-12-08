@@ -74,6 +74,12 @@ jobs:
         working-directory: terraform
         run: terraform apply -auto-approve
 
+
+      - name: Get Public IP
+        working-directory: terraform
+        id: tf_output
+        run: echo "PUBLIC_IP=$(terraform output -raw public_ip)" >> $GITHUB_ENV
+
       #############################
       # 8. Install Ansible
       #############################
@@ -93,17 +99,17 @@ jobs:
       - name: Run Ansible Playbook
         working-directory: ansible
         run: |
-          # Get public IP from Terraform output
-          PUBLIC_IP=$(terraform output -raw public_ip | tr -d '"')
+          # Verify PUBLIC_IP is set
+          echo "Using PUBLIC_IP=$PUBLIC_IP"
 
           # Create inventory file
-          INVENTORY_FILE="inventory.ini"
-          echo "[web]" > $INVENTORY_FILE
-          echo "$PUBLIC_IP ansible_user=ubuntu ansible_ssh_private_key_file=$(pwd)/../id_rsa" >> $INVENTORY_FILE
+          echo "[web]" > inventory.ini
+          echo "$PUBLIC_IP ansible_user=ubuntu ansible_ssh_private_key_file=$(pwd)/../id_rsa" >> inventory.ini
 
-          # Verify inventory
-          cat $INVENTORY_FILE
+          # Debug inventory
+          cat inventory.ini
 
           # Run Ansible playbook
-          ansible-playbook -i $INVENTORY_FILE playbook.yml --ssh-extra-args="-o StrictHostKeyChecking=no"
+          ansible-playbook -i inventory.ini playbook.yml --ssh-extra-args="-o StrictHostKeyChecking=no"
+
 
