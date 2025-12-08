@@ -1,45 +1,112 @@
 - hosts: web
   become: yes
 
+  vars:
+    app_dir: /opt/app
+    service_name: app
+    python_exec: python3
+    pip_exec: pip3
+    nginx_conf_path: /etc/nginx/sites-available/app
+    nginx_conf_link: /etc/nginx/sites-enabled/app
+
   tasks:
 
-    - name: Install Python 3
-      yum:
-        name: python3
+    #########################################
+    # 1. Update apt and install dependencies
+    #########################################
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-pip
+          - nginx
         state: present
 
-    - name: Install pip
-      yum:
-        name: python3-pip
-        state: present
-
+    #########################################
+    # 2. Create application directory
+    #########################################
     - name: Create app directory
-      file:
-        path: /opt/app
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
         state: directory
         mode: "0755"
 
+    #########################################
+    # 3. Copy application files
+    #########################################
     - name: Copy application files
-      copy:
+      ansible.builtin.copy:
         src: ../app/
-        dest: /opt/app/
+        dest: "{{ app_dir }}/"
         mode: "0755"
 
-    - name: Install dependencies
-      pip:
-        requirements: /opt/app/requirements.txt
+    #########################################
+    # 4. Install Python dependencies
+    #########################################
+    - name: Install Python dependencies
+      ansible.builtin.pip:
+        requirements: "{{ app_dir }}/requirements.txt"
+        executable: "{{ pip_exec }}"
 
+    #########################################
+    # 5. Copy systemd service
+    #########################################
     - name: Copy systemd service
-      copy:
+      ansible.builtin.copy:
         src: ../app/app.service
-        dest: /etc/systemd/system/app.service
+        dest: /etc/systemd/system/{{ service_name }}.service
+        mode: "0644"
 
     - name: Reload systemd
-      systemd:
+      ansible.builtin.systemd:
         daemon_reload: yes
 
-    - name: Start app service
-      systemd:
-        name: app
+    - name: Start and enable app service
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
         state: started
+        enabled: yes
+
+    #########################################
+    # 6. Configure Nginx as reverse proxy
+    #########################################
+    - name: Create Nginx config for app
+      ansible.builtin.copy:
+        dest: "{{ nginx_conf_path }}"
+        content: |
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  proxy_pass http://127.0.0.1:5000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+          }
+        mode: "0644"
+
+    - name: Enable Nginx site
+      ansible.builtin.file:
+        src: "{{ nginx_conf_path }}"
+        dest: "{{ nginx_conf_link }}"
+        state: link
+        force: yes
+
+    - name: Test Nginx configuration
+      ansible.builtin.command: nginx -t
+      register: nginx_test
+      failed_when: nginx_test.rc != 0
+
+    - name: Reload Nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: restarted
         enabled: yes
