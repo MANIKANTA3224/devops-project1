@@ -43,6 +43,8 @@
         owner: ubuntu
         group: ubuntu
         mode: "0755"
+      notify:
+        - Restart Flask app  # <--- Restart when files change
 
     #########################################
     # 4. Create Python virtual environment
@@ -62,6 +64,8 @@
         virtualenv: "{{ venv_dir }}"
         virtualenv_python: python3
       become_user: ubuntu
+      notify:
+        - Restart Flask app  # <--- Restart if dependencies change
 
     #########################################
     # 6. Ensure ownership of app directory
@@ -89,16 +93,16 @@
           User=ubuntu
           Group=ubuntu
           WorkingDirectory={{ app_dir }}
-          ExecStart=/opt/app/venv/bin/python -m flask run --host=127.0.0.1 --port=5000 --reload
+          ExecStart={{ venv_dir }}/bin/python -m flask run --host=127.0.0.1 --port={{ flask_port }} --reload
           Environment="FLASK_APP=app.py"
           Environment="FLASK_ENV=development"
-
           Restart=always
 
           [Install]
           WantedBy=multi-user.target
       notify:
         - Reload systemd
+        - Restart Flask app
 
     #########################################
     # 8. Enable & start the service
@@ -154,3 +158,9 @@
   handlers:
     - name: Reload systemd
       command: systemctl daemon-reload
+
+    - name: Restart Flask app
+      systemd:
+        name: app
+        state: restarted
+        daemon_reload: yes
