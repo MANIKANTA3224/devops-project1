@@ -3,9 +3,10 @@
 
   vars:
     app_dir: /opt/app
+    venv_dir: /opt/app/venv
     service_name: app
-    python_exec: python3
-    pip_exec: pip3
+    python_bin: /opt/app/venv/bin/python
+    pip_bin: /opt/app/venv/bin/pip
     nginx_conf_path: /etc/nginx/sites-available/app
     nginx_conf_link: /etc/nginx/sites-enabled/app
 
@@ -17,12 +18,11 @@
     - name: Update apt cache
       ansible.builtin.apt:
         update_cache: yes
-        cache_valid_time: 3600
 
     - name: Install required packages
       ansible.builtin.apt:
         name:
-          - python3
+          - python3-venv
           - python3-pip
           - nginx
         state: present
@@ -46,20 +46,40 @@
         mode: "0755"
 
     #########################################
-    # 4. Install Python dependencies
+    # 4. Create Python virtual environment
+    #########################################
+    - name: Create virtual environment
+      ansible.builtin.command:
+        cmd: python3 -m venv "{{ venv_dir }}"
+        creates: "{{ venv_dir }}/bin/activate"
+
+    #########################################
+    # 5. Install Python dependencies inside venv
     #########################################
     - name: Install Python dependencies
       ansible.builtin.pip:
         requirements: "{{ app_dir }}/requirements.txt"
-        executable: "{{ pip_exec }}"
+        executable: "{{ pip_bin }}"
 
     #########################################
-    # 5. Copy systemd service
+    # 6. Copy systemd service (use venv)
     #########################################
     - name: Copy systemd service
       ansible.builtin.copy:
-        src: ../app/app.service
         dest: /etc/systemd/system/{{ service_name }}.service
+        content: |
+          [Unit]
+          Description=Python App Service
+          After=network.target
+
+          [Service]
+          User=ubuntu
+          WorkingDirectory={{ app_dir }}
+          ExecStart={{ python_bin }} app.py
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
         mode: "0644"
 
     - name: Reload systemd
@@ -73,7 +93,7 @@
         enabled: yes
 
     #########################################
-    # 6. Configure Nginx as reverse proxy
+    # 7. Configure Nginx as reverse proxy
     #########################################
     - name: Create Nginx config for app
       ansible.builtin.copy:
