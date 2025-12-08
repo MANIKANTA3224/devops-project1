@@ -1,0 +1,45 @@
+- hosts: web
+  become: yes
+
+  tasks:
+
+    - name: Install Python 3
+      yum:
+        name: python3
+        state: present
+
+    - name: Install pip
+      yum:
+        name: python3-pip
+        state: present
+
+    - name: Create app directory
+      file:
+        path: /opt/app
+        state: directory
+        mode: "0755"
+
+    - name: Copy application files
+      copy:
+        src: ../app/
+        dest: /opt/app/
+        mode: "0755"
+
+    - name: Install dependencies
+      pip:
+        requirements: /opt/app/requirements.txt
+
+    - name: Copy systemd service
+      copy:
+        src: ../app/app.service
+        dest: /etc/systemd/system/app.service
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+
+    - name: Start app service
+      systemd:
+        name: app
+        state: started
+        enabled: yes

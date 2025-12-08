@@ -1,0 +1,11 @@
+[Unit]
+Description=Python Flask App
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/app/app.py
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
