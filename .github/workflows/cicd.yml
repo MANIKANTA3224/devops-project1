@@ -74,14 +74,16 @@ jobs:
         working-directory: terraform
         run: terraform apply -auto-approve
 
-
+      #############################
+      # 8. Capture Public IP output
+      #############################
       - name: Get Public IP
         working-directory: terraform
         id: tf_output
         run: echo "PUBLIC_IP=$(terraform output -raw public_ip)" >> $GITHUB_ENV
 
       #############################
-      # 8. Install Ansible
+      # 9. Install Ansible
       #############################
       - name: Install Ansible
         run: |
@@ -89,29 +91,27 @@ jobs:
           sudo apt install -y ansible
 
       #############################
-      # 9. Setup SSH Key from GitHub Secret
+      # 10. Save SSH Key
       #############################
       - name: Save SSH private key
         run: |
           mkdir -p ansible/keys
-          echo "$EC2_SSH_KEY" > ansible/keys/id_rsa
+          echo "${{ secrets.EC2_SSH_KEY }}" > ansible/keys/id_rsa
           chmod 600 ansible/keys/id_rsa
 
-
+      #############################
+      # 11. Run Ansible Playbook
+      #############################
       - name: Run Ansible Playbook
         working-directory: ansible
         run: |
-          # Verify PUBLIC_IP is set
           echo "Using PUBLIC_IP=$PUBLIC_IP"
 
-          # Create inventory file
+          # Create correct inventory file
           echo "[web]" > inventory.ini
-          echo "$PUBLIC_IP ansible_user=ubuntu ansible_ssh_private_key_file=$(pwd)/../id_rsa" >> inventory.ini
+          echo "$PUBLIC_IP ansible_user=ubuntu ansible_ssh_private_key_file=$(pwd)/keys/id_rsa" >> inventory.ini
 
-          # Debug inventory
+          echo "---- INVENTORY CONTENT -----"
           cat inventory.ini
 
-          # Run Ansible playbook
           ansible-playbook -i inventory.ini playbook.yml --ssh-extra-args="-o StrictHostKeyChecking=no"
-
-
