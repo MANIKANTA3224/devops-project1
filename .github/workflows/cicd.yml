@@ -91,10 +91,12 @@ jobs:
       #############################
       # 9. Setup SSH Key from GitHub Secret
       #############################
-      - name: Create private key for Ansible
+      - name: Save SSH private key
         run: |
-          echo "${{ secrets.ANSIBLE_PRIVATE_KEY }}" > id_rsa
-          chmod 600 id_rsa
+          mkdir -p ansible/keys
+          echo "$EC2_SSH_KEY" > ansible/keys/id_rsa
+          chmod 600 ansible/keys/id_rsa
+
 
       - name: Run Ansible Playbook
         working-directory: ansible
