@@ -8,7 +8,7 @@
 
   tasks:
     #########################################
-    # 1. Update apt cache & install dependencies
+    # 1. Install dependencies
     #########################################
     - name: Update apt cache
       apt:
@@ -44,10 +44,10 @@
         group: ubuntu
         mode: "0755"
       notify:
-        - Restart Flask app  # <--- Restart when files change
+        - Restart Flask app
 
     #########################################
-    # 4. Create Python virtual environment
+    # 4. Create virtual environment
     #########################################
     - name: Create virtual environment
       command: python3 -m venv "{{ venv_dir }}"
@@ -56,19 +56,18 @@
       become_user: ubuntu
 
     #########################################
-    # 5. Install Python dependencies in venv
+    # 5. Install Python dependencies
     #########################################
     - name: Install Python dependencies
       pip:
         requirements: "{{ app_dir }}/requirements.txt"
         virtualenv: "{{ venv_dir }}"
-        virtualenv_python: python3
       become_user: ubuntu
       notify:
-        - Restart Flask app  # <--- Restart if dependencies change
+        - Restart Flask app
 
     #########################################
-    # 6. Ensure ownership of app directory
+    # 6. Set ownership
     #########################################
     - name: Set ownership of app directory
       file:
@@ -79,23 +78,21 @@
         group: ubuntu
 
     #########################################
-    # 7. Setup systemd service
+    # 7. Systemd service (using Gunicorn)
     #########################################
-    - name: Copy systemd service file
+    - name: Add systemd service
       copy:
         dest: /etc/systemd/system/app.service
         content: |
           [Unit]
-          Description=Python Flask App
+          Description=Gunicorn Flask App
           After=network.target
 
           [Service]
           User=ubuntu
           Group=ubuntu
           WorkingDirectory={{ app_dir }}
-          ExecStart={{ venv_dir }}/bin/python -m flask run --host=127.0.0.1 --port={{ flask_port }} --reload
-          Environment="FLASK_APP=app.py"
-          Environment="FLASK_ENV=development"
+          ExecStart={{ venv_dir }}/bin/gunicorn -w 3 -b 127.0.0.1:{{ flask_port }} app:app
           Restart=always
 
           [Install]
@@ -105,18 +102,18 @@
         - Restart Flask app
 
     #########################################
-    # 8. Enable & start the service
+    # 8. Enable + start app
     #########################################
     - name: Enable and start app service
       systemd:
         name: app
-        state: started
         enabled: yes
+        state: started
 
     #########################################
-    # 9. Configure Nginx
+    # 9. Setup Nginx reverse proxy
     #########################################
-    - name: Configure Nginx reverse proxy
+    - name: Configure Nginx
       copy:
         dest: /etc/nginx/sites-available/app
         content: |
@@ -147,14 +144,11 @@
     - name: Test Nginx configuration
       command: nginx -t
 
-    - name: Reload Nginx
+    - name: Restart Nginx
       service:
         name: nginx
         state: restarted
 
-  #########################################
-  # Handlers
-  #########################################
   handlers:
     - name: Reload systemd
       command: systemctl daemon-reload
@@ -163,4 +157,3 @@
       systemd:
         name: app
         state: restarted
-        daemon_reload: yes
