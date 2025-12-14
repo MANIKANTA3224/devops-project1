@@ -4,6 +4,9 @@ A fully automated DevOps workflow to provision infrastructure on AWS and deploy 
 
 ---
 
+<img width="1046" height="1244" alt="Project" src="https://github.com/user-attachments/assets/9b08f585-8eda-4eee-a1b3-018259106884" />
+
+
 ## Overview
 
 This project implements an end-to-end CI/CD pipeline:
@@ -17,18 +20,7 @@ This project implements an end-to-end CI/CD pipeline:
 
 ---
 
-## Architecture Diagram
 
-Add your architecture diagram image to the repository and reference it here.
-
-Example:
-
-```
-<img width="1046" height="1244" alt="Project" src="https://github.com/user-attachments/assets/9b08f585-8eda-4eee-a1b3-018259106884" />
-
-```
-
----
 
 ## Setup Instructions
 
