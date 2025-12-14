@@ -1,66 +1,142 @@
 # CI/CD Pipeline for Flask App — Terraform, Ansible & GitHub Actions on AWS
 
-A fully automated DevOps workflow to provision infrastructure on AWS and deploy a Flask application onto an EC2 instance using Terraform, Ansible and GitHub Actions.
+A fully automated DevOps workflow to provision infrastructure on AWS and deploy a Flask application onto an EC2 instance using **Terraform**, **Ansible**, and **GitHub Actions**.
 
 ---
 
 ## Overview
 
-This project implements an end-to-end pipeline:
+This project implements an end-to-end CI/CD pipeline:
 
 1. Developer pushes code to GitHub → triggers GitHub Actions.
-2. GitHub Actions runs Terraform to provision AWS infra (EC2, Security Group, Key Pair) and persists state in S3.
+2. GitHub Actions runs Terraform to provision AWS infrastructure (EC2, Security Group, Key Pair) and stores Terraform state in S3.
 3. Terraform outputs the EC2 public IP.
-4. GitHub Actions updates the Ansible inventory with the EC2 public IP.
-5. Ansible configures the server (Python, virtualenv, Gunicorn, NGINX) and deploys the Flask app.
-6. The app is served via Gunicorn behind NGINX and is accessible using the EC2 public IP.
-
-Architecture Diagram
-- (Add your diagram image file to the repo and reference it here)
-- Example: `docs/architecture.png`
+4. GitHub Actions updates the Ansible inventory using the EC2 public IP.
+5. Ansible configures the EC2 instance (Python, virtualenv, Gunicorn, NGINX) and deploys the Flask app.
+6. The Flask application is served via Gunicorn behind NGINX and is accessible using the EC2 public IP.
 
 ---
 
-## Repository Structure (example)
+## Architecture Diagram
 
-- .github/workflows/cicd.yml          # GitHub Actions workflow
-- terraform/
-  - main.tf
-  - variables.tf
-  - outputs.tf
-  - backend.tf                        # S3 backend config
-- ansible/
-  - inventory                         # Template inventory updated by CI
-  - playbook.yml
-  - roles/
-    - app/
-      - tasks/
-      - templates/
-  - keys/
-    - id_rsa.pub
-    - id_rsa
-- app/
-  - requirements.txt
-  - app.py
-  - wsgi.py
-- docs/
-  - architecture.png
+Add your architecture diagram image to the repository and reference it here.
 
-(Adjust the structure to match your repo.)
+Example:
+
+```
+<img width="1046" height="1244" alt="Project" src="https://github.com/user-attachments/assets/9b08f585-8eda-4eee-a1b3-018259106884" />
+
+```
+
+---
+
+## Setup Instructions
+
+### 1. Prerequisites
+
+#### Local / Repository Requirements
+
+Your GitHub repository **must** contain the following structure:
+
+* `terraform/` → All Terraform configuration files
+* `ansible/deploy.yml` → Main Ansible playbook for deployment
+* `app/` → Flask application source code
+* `.github/workflows/ci-cd.yml` → GitHub Actions CI/CD workflow
+
+---
+
+### 2. AWS Requirements
+
+* AWS Account
+* IAM User with the following **minimum required permissions**:
+
+  * `AmazonEC2FullAccess`
+  * `AmazonS3FullAccess`
+  * `IAMReadOnlyAccess`
+  * `AmazonVPCReadOnlyAccess`
+
+> These IAM user credentials will be stored securely in **GitHub Secrets**.
+
+---
+
+### 3. EC2 Key Pair (Manual Setup)
+
+The EC2 key pair **must be created manually**.
+
+Steps:
+
+1. Go to **AWS Console → EC2 → Key Pairs**
+2. Create a new key pair (example: `avinash-key`)
+3. Download the `.pem` file
+4. Open the `.pem` file and copy its contents
+5. Store the content in GitHub Secrets as `SSH_PRIVATE_KEY`
+
+This key is required for:
+
+* Terraform to associate the EC2 instance with the key pair
+* GitHub Actions (via Ansible) to SSH into the EC2 instance
+
+---
+
+### 4. GitHub Secrets Configuration
+
+Go to:
+
+```
+GitHub Repo → Settings → Secrets → Actions
+```
+
+Add the following secrets:
+
+| Secret Name             | Description                        |
+| ----------------------- | ---------------------------------- |
+| `AWS_ACCESS_KEY_ID`     | IAM user access key                |
+| `AWS_SECRET_ACCESS_KEY` | IAM user secret key                |
+| `SSH_PRIVATE_KEY`       | Content of the EC2 `.pem` key file |
+
+---
+
+## Repository Structure
+
+```
+.
+├── .github/workflows/
+│   └── cicd.yml              # GitHub Actions CI/CD pipeline
+│
+├── terraform/
+│   ├── main.tf
+│   ├── variables.tf
+│   ├── outputs.tf
+│   └── providers.tf          # S3 backend configuration
+│
+├── ansible/
+│   ├── inventory             # Updated dynamically by CI
+│   ├── playbook.yml          # Server setup & app deployment
+│   └── keys/
+│       └── id_rsa.pub        # Public SSH key
+│
+├── app/
+│   ├── app.py
+│   └── requirements.txt
+│
+└── README.md
+```
 
 ---
 
 ## Key Components
 
-### Terraform (AWS Provisioning)
+### Terraform — AWS Infrastructure Provisioning
 
-- Provisions:
-  - Security Group (allows HTTP 80 and SSH 22)
-  - EC2 instance (Ubuntu 22.04, t2.micro, key pair)
-  - Key Pair (reads public key from `ansible/keys/id_rsa.pub`)
-- S3 backend stores encrypted terraform state.
+Terraform provisions the following AWS resources:
 
-Example backend configuration (terraform/backend.tf)
+* EC2 instance (Ubuntu 22.04, t2.micro)
+* Security Group (SSH 22, HTTP 80)
+* Key Pair (using Ansible public key)
+* S3 backend for Terraform state storage
+
+#### Example S3 Backend Configuration
+
 ```hcl
 terraform {
   backend "s3" {
@@ -72,7 +148,8 @@ terraform {
 }
 ```
 
-Example key-pair resource
+#### Example Key Pair Resource
+
 ```hcl
 resource "aws_key_pair" "main_key" {
   key_name   = "main-static-key"
@@ -80,55 +157,51 @@ resource "aws_key_pair" "main_key" {
 }
 ```
 
-EC2 instance notes:
-- AMI: Ubuntu 22.04 (use appropriate AMI id per region)
-- Instance type: t2.micro
-- SSH key: `main-static-key`
-- Security group: allows inbound 22 and 80, outbound all
-
-Terraform should output the instance public IP (e.g., `instance_public_ip`) to be consumed by CI.
+Terraform outputs the EC2 public IP which is consumed by GitHub Actions.
 
 ---
 
-### GitHub Actions (CI/CD)
+### GitHub Actions — CI/CD Automation
 
-Workflow path: `.github/workflows/cicd.yml`
+Workflow path:
 
-Typical job steps:
+```
+.github/workflows/cicd.yml
+```
+
+Pipeline steps:
+
 1. Checkout repository
-2. Configure AWS credentials (via `aws-actions/configure-aws-credentials`)
-3. terraform init/plan/apply (use auto-approve or manual approval as you prefer)
-4. Capture Terraform output for EC2 Public IP
-5. Update Ansible inventory (replace placeholder host with the public IP)
-6. Run Ansible playbook to configure & deploy app
+2. Configure AWS credentials
+3. Terraform init, plan, apply
+4. Capture EC2 public IP from Terraform output
+5. Update Ansible inventory
+6. Execute Ansible playbook
 
-Example snippet to capture terraform output and update inventory (bash):
+#### Example Inventory Update Step
+
 ```bash
-# Run in the GitHub Actions runner after terraform apply
 EC2_IP=$(terraform output -raw instance_public_ip)
-# Replace placeholder in ansible/inventory (inventory template should have e.g. [web] x.x.x.x)
 sed -i "s/{{EC2_PUBLIC_IP}}/${EC2_IP}/g" ansible/inventory
 ```
 
-Make sure to store AWS credentials and any secrets as GitHub Actions secrets.
-
 ---
 
-### Ansible (Server Setup & Deployment)
+### Ansible — Server Configuration & Deployment
 
-Main responsibilities:
-- Install Python3, pip, virtualenv, Gunicorn, NGINX.
-- Create a venv, e.g. `/home/ubuntu/venv`.
-- Copy application to `/home/ubuntu/app/`.
-- Install app dependencies: `pip install -r requirements.txt` inside the venv.
-- Configure Gunicorn systemd service.
-- Configure NGINX as a reverse proxy (port 80 → Gunicorn port, typically 5000).
-- Ensure service is started and enabled.
+Ansible handles:
 
-Example Gunicorn systemd unit (template):
+* Installing Python, pip, virtualenv
+* Installing Gunicorn and NGINX
+* Deploying Flask app
+* Configuring systemd service for Gunicorn
+* Configuring NGINX reverse proxy
+
+#### Gunicorn systemd Service Example
+
 ```ini
 [Unit]
-Description=gunicorn daemon for Flask app
+Description=Gunicorn daemon for Flask app
 After=network.target
 
 [Service]
@@ -142,7 +215,8 @@ ExecStart=/home/ubuntu/venv/bin/gunicorn -w 3 -b 127.0.0.1:5000 app:app
 WantedBy=multi-user.target
 ```
 
-Example NGINX server block (template)
+#### NGINX Configuration Example
+
 ```nginx
 server {
     listen 80;
@@ -157,102 +231,38 @@ server {
 }
 ```
 
-Typical Ansible playbook tasks:
-- apt update & install packages
-- python3 -m venv /home/ubuntu/venv
-- copy app files to `/home/ubuntu/app/`
-- pip install -r /home/ubuntu/app/requirements.txt
-- install and enable gunicorn systemd unit
-- configure NGINX, remove default site, restart services
-
 ---
 
-## Deployment Flow (summary)
+## Deployment Flow (Summary)
 
-1. Push code to repository → GitHub Actions triggered.
-2. Terraform provisions/updates resources and writes state to S3.
-3. Terraform outputs EC2 public IP.
-4. CI updates Ansible inventory with that public IP.
-5. CI runs Ansible playbook to configure server & deploy the Flask app.
-6. Application is available at `http://<EC2_PUBLIC_IP>/`.
+1. Code pushed to GitHub
+2. GitHub Actions triggered
+3. Terraform provisions infrastructure
+4. EC2 public IP captured
+5. Ansible inventory updated
+6. Flask app deployed and started
+7. App available at:
 
----
-
-## How to Use (local / CI guidelines)
-
-Prerequisites:
-- AWS account & IAM credentials with permissions for EC2, S3, IAM (if needed), VPC.
-- Terraform v1.x
-- Ansible 2.9+ (or latest)
-- Python 3.8+
-- Add your SSH key pair public key to `ansible/keys/id_rsa.pub` (and keep private key secure)
-
-Local test flow (high level):
-1. Put your public key at `ansible/keys/id_rsa.pub`.
-2. terraform init && terraform apply -auto-approve
-3. Grab the public IP: `terraform output -raw instance_public_ip`
-4. Update `ansible/inventory` with the IP, or run:
-   `ansible-playbook -i ansible/inventory ansible/playbook.yml --private-key ansible/keys/id_rsa`
-5. Visit `http://<EC2_PUBLIC_IP>/`
-
-CI flow:
-- Configure GitHub repository secrets for AWS access and any other credentials.
-- Ensure the Actions workflow runs terraform and then Ansible with the private key (or use SSH agent and secrets).
-
-Security note:
-- Do not commit private keys to the repo. Use GitHub Secrets and/or a secure secrets manager.
-- Limit security group (SSH) to trusted IPs if necessary.
-
----
-
-## Files to Customize
-
-- `.github/workflows/cicd.yml` — Customize steps, region, and permissions.
-- `terraform/variables.tf` — set region, instance type, AMI id (per region), bucket name.
-- `ansible/inventory` — template to be filled by CI with EC2 public IP.
-- `ansible/playbook.yml` and roles — edit for your app specifics (entrypoint, port).
-- `ansible/keys/id_rsa.pub` — public key used by Terraform to create key-pair.
-
----
-
-## Tips & Troubleshooting
-
-- AMI selection: use official Ubuntu 22.04 AMI ID for your AWS region.
-- If Terraform cannot read the public key path, ensure relative path is correct (`path.module` usage).
-- Verify S3 backend bucket exists and proper IAM permissions are configured.
-- Use `terraform output -json` for structured output parsing in CI.
-- Use `ssh -i ansible/keys/id_rsa ubuntu@<EC2_IP>` to debug server configuration manually.
-
----
-
-## Example Variables (terraform/variables.tf)
-```hcl
-variable "region" {
-  type    = string
-  default = "ap-southeast-1"
-}
-
-variable "instance_type" {
-  type    = string
-  default = "t2.micro"
-}
-
-variable "key_name" {
-  type    = string
-  default = "main-static-key"
-}
+```
+http://<EC2_PUBLIC_IP>/
 ```
 
 ---
 
-## License & Author
+## Security Best Practices
 
-- Author: MANIKANTA3224
-- License: (add your preferred license here, e.g., MIT)
+* ❌ Never commit private keys to GitHub
+* ✅ Use GitHub Secrets for credentials
+* ✅ Restrict SSH access in Security Groups
+* ✅ Use encrypted S3 backend for Terraform state
 
 ---
 
-If you want, I can:
-- Generate a ready-to-use `.github/workflows/cicd.yml` example for this pipeline.
-- Provide a complete Terraform module and Ansible playbook skeleton to drop into the repo.
-- Add a sample architecture diagram file and embed it in the README.
+## Author 
+
+* **Author:** MANIKANTA3224
+
+
+---
+
+⭐ This project demonstrates a complete real-world DevOps CI/CD pipeline using AWS, Terraform, Ansible, and GitHub Actions.
