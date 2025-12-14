@@ -58,7 +58,7 @@ The EC2 key pair **must be created manually**.
 Steps:
 
 1. Go to **AWS Console → EC2 → Key Pairs**
-2. Create a new key pair (example: `avinash-key`)
+2. Create a new key pair (example: `deva-key`)
 3. Download the `.pem` file
 4. Open the `.pem` file and copy its contents
 5. Store the content in GitHub Secrets as `SSH_PRIVATE_KEY`
