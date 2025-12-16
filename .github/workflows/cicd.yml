@@ -118,3 +118,9 @@ jobs:
         working-directory: ansible
         run: |
           ansible-playbook -i inventory.ini playbook.yml --ssh-extra-args="-o StrictHostKeyChecking=no"
+      #############################
+      # Force destroy old EC2
+      #############################
+      - name: Terraform Destroy (force recreate EC2)
+        working-directory: terraform
+        run: terraform destroy -auto-approve || true
