@@ -93,11 +93,12 @@ jobs:
       #############################
       # 10. Save SSH Key
       #############################
-      - name: Save SSH private key
+      - name: Setup SSH Key
         run: |
           mkdir -p ansible/keys
           echo "${{ secrets.EC2_SSH_KEY }}" > ansible/keys/id_rsa
           chmod 600 ansible/keys/id_rsa
+
 
       #############################
       # 11. Run Ansible Playbook
