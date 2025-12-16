@@ -35,7 +35,7 @@ resource "aws_security_group" "web_sg" {
 # Key Pair
 resource "aws_key_pair" "main_key" {
   key_name   = "main-static-key"
-  public_key = file("ansible/keys/id_rsa.pub")
+  public_key = file("${path.module}/../ansible/keys/id_rsa.pub")
 }
 
 
