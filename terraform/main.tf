@@ -49,6 +49,9 @@ resource "aws_instance" "web_server" {
   vpc_security_group_ids = [
     aws_security_group.web_sg.id
   ]
+  depends_on = [
+    aws_key_pair.main_key
+  ]
 
 
   tags = {
