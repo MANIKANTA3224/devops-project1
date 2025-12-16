@@ -34,9 +34,10 @@ resource "aws_security_group" "web_sg" {
 
 # Key Pair
 resource "aws_key_pair" "main_key" {
-  key_name   = "main-static-key"
+  key_name   = "github-actions-key"
   public_key = file("${path.module}/../ansible/keys/id_rsa.pub")
 }
+
 
 
 # EC2 Instance
@@ -45,9 +46,10 @@ resource "aws_instance" "web_server" {
   instance_type = "t2.micro"
   key_name      = aws_key_pair.main_key.key_name
 
-  security_groups = [
-    aws_security_group.web_sg.name
+  vpc_security_group_ids = [
+    aws_security_group.web_sg.id
   ]
+
 
   tags = {
     Name = "devops-web-server"
