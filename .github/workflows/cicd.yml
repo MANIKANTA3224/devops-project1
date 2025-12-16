@@ -91,13 +91,14 @@ jobs:
           sudo apt install -y ansible
 
       #############################
-      # 10. Save SSH Key
+      # 9. Generate SSH Key
       #############################
-      - name: Save SSH private key
+      - name: Generate SSH key
         run: |
           mkdir -p ansible/keys
-          echo "${{ secrets.EC2_SSH_KEY }}" > ansible/keys/id_rsa
+          ssh-keygen -t rsa -b 4096 -f ansible/keys/id_rsa -N ""
           chmod 600 ansible/keys/id_rsa
+
 
       #############################
       # 11. Create dynamic inventory
