@@ -93,11 +93,12 @@ jobs:
       #############################
       # 10. Save SSH Key
       #############################
-      - name: Setup SSH Key
+      - name: Copy SSH key
         run: |
-          mkdir -p ansible/keys
-          echo "${{ secrets.EC2_SSH_KEY }}" > ansible/keys/id_rsa
-          chmod 600 ansible/keys/id_rsa
+          mkdir -p ~/ansible/keys
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/ansible/keys/id_rsa
+          chmod 600 ~/ansible/keys/id_rsa
+
 
 
       #############################
